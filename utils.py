@@ -55,7 +55,7 @@ def write_csv(file_pattern):
     df.subject = pd.Categorical(df.subject)
     df['label'] = df.subject.cat.codes
     df.to_csv('./data/img_info.csv', index= False)
-    print(f'Saved the csv to ./data/img_info.csv ')
+    print(f'Saved the csv to ./data/CASIA/img_info.csv ')
 
 if __name__ == '__main__':
-    write_csv('./data/CASIA-washed/*/*')
+    write_csv('./data/CASIA/*/*')
