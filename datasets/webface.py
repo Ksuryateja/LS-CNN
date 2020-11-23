@@ -3,7 +3,6 @@ import torch.utils.data as data
 import numpy as np
 import pandas as pd
 from PIL import Image
-import os
 import torch
 
 
@@ -47,8 +46,8 @@ class  CASIAWebFace(data.Dataset):
         return len(self.img_list)
 
 if __name__ == '__main__':
-
-    transform = transforms.Compose([
+    pass
+    '''transform = transforms.Compose([
                 
                 transforms.RandomCrop(128),
                 transforms.RandomHorizontalFlip(),
@@ -58,6 +57,6 @@ if __name__ == '__main__':
     dataset = CASIAWebFace(imgInfo_csv = './data/img_info.csv', transform = transform)
     trainloader = data.DataLoader(dataset, batch_size = 64, shuffle = True, num_workers= 2, drop_last=False)
     print(len(dataset))
-
+'''
 
 
