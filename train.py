@@ -6,6 +6,8 @@ from datetime import datetime
 from model import LSCNN
 from utils import init_log
 from datasets.webface import CASIAWebFace
+from datasets.lfw import LFW
+from eval_lfw import evaluation_10_fold, getFeatureFromTorch
 from torch.optim import lr_scheduler
 import torch.optim as optim
 import time
@@ -42,10 +44,11 @@ def train(args):
                 transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))  # range [0.0, 1.0] -> [-1.0,1.0]
                 ])
     # validation dataset
-    dataset = CASIAWebFace(args.train_data_info, transform = transform)
-    train_set, val_set = torch.utils.data.random_split(dataset, [int(ceil(0.8 * len(dataset))), len(dataset) - int(ceil(0.8 * len(dataset)))])
-    train_loader = torch.utils.data.DataLoader(train_set, batch_size=args.batch_size, shuffle=True, num_workers=8, drop_last=False)
-    val_loader = torch.utils.data.DataLoader(val_set, batch_size=args.batch_size, shuffle=False, num_workers=8, drop_last=False)
+    train_set = CASIAWebFace(args.train_data_info, transform = transform)
+    
+    train_loader = torch.utils.data.DataLoader(train_set, batch_size=args.batch_size, shuffle=True, num_workers=32, drop_last=False)
+    lfw_dataset = LFW('./data/lfw_funneled', './data/lfw_funneled/pairs.txt')
+    lfw_dataloader = torch.utils.data.DataLoader(lfw_dataset, batch_size= 128, shuffle=False, num_workers=32, drop_last=False)
     
     net = LSCNN(num_classes= 10559, growth_rate = 48)
     
@@ -55,7 +58,7 @@ def train(args):
 
     # define optimizers for different layer
     criterion = torch.nn.CrossEntropyLoss().to(device)
-    optimizer_ft = optim.SGD(net.parameters(), lr = 0.1, weight_decay = 1e-4, momentum = 0.9)
+    optimizer_ft = optim.SGD(net.parameters(), lr = 0.1, weight_decay = 1e-4, momentum = 0.9, nesterov = True)
     exp_lr_scheduler = lr_scheduler.MultiStepLR(optimizer_ft, milestones=[10, 20, 30], gamma=0.1)
     
     if multi_gpus:
@@ -63,8 +66,8 @@ def train(args):
     else:
         net = net.to(device)
 
-    best_val_acc = 0.0
-    best_val_iters = 0
+    best_test_acc = 0.0
+    best_test_iters = 0
     total_iters = 0
 
     for epoch in range(1, args.total_epoch + 1):
@@ -117,38 +120,21 @@ def train(args):
 
             # test accuracy
             if total_iters % args.test_freq == 0:
-
                 with torch.no_grad():
-                    val_loss = []
-                    val_acc = []
                     net.eval()
-                    for data in val_loader:
-                        img, label = data[0].to(device), data[1].to(device)
+                    getFeatureFromTorch('./result/cur_epoch_lfw_result.mat', net, device, lfw_dataset, lfw_dataloader)
+                    lfw_accuracy = evaluation_10_fold('./result/cur_epoch_lfw_result.mat')
+                    lfw_accuracy = np.mean(lfw_accuracy) * 100             
+                writer.add_scalar("Accuracy/test", lfw_accuracy, total_iters)
+                _print(f'LFW Ave Accuracy: {lfw_accuracy.item():.4f}')
+                if best_test_acc <= lfw_accuracy.item() :
+                    best_test_acc = lfw_accuracy.item() 
+                    best_test_iters = total_iters
 
-                        output = net(img)
-                        val_loss.append(criterion(output, label).view(1))
-                        _, predict = torch.max(output.data, 1)
-                        total = label.size(0)
-                        correct = torch.from_numpy(np.array(predict.cpu()) == np.array(label.data.cpu())).sum()
-                        val_acc.append(correct.view(1) / total)
-                
-                val_acc = torch.cat(val_acc, dim=0)
-                val_loss = torch.cat(val_loss, dim = 0)
-                val_acc = torch.mean(val_acc) * 100
-                val_loss = torch.mean(val_loss)
-                
-                writer.add_scalar("Accuracy/val", val_acc, total_iters)
-                writer.add_scalar("Loss/val", val_loss, total_iters)
-                
-                _print(f'val Ave Accuracy: {val_acc.item():.4f}, val Ave Loss: {val_loss.item():.4f}')
-                if best_val_acc <= val_acc.item() :
-                    best_val_acc = val_acc.item() 
-                    best_val_iters = total_iters
-
-                _print(f'Current Best Accuracy: val: {best_val_acc:.4f} in iters: {best_val_iters}')
+                _print(f'Current Best Accuracy: test: {best_test_acc:.4f} in iters: {best_test_iters}')
                 net.train()
 
-    _print('Finally Best Accuracy: val: {:.4f} in iters: {}'.format(best_val_acc, best_val_iters))
+    _print('Finally Best Accuracy: val: {:.4f} in iters: {}'.format(best_test_acc, best_test_iters))
     print('finishing training')
 
 

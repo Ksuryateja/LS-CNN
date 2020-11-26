@@ -88,8 +88,23 @@ def getFeatureFromTorch(feature_save_dir, net, device, data_set, data_loader):
             data[i] = data[i].to(device)
         count += data[0].size(0)
         #print('extracing deep features from the face pair {}...'.format(count))
+
+        activation = {}
+        def get_activation(name: str):
+            def hook(model, input, output):
+                activation[name] = output.detach()
+            return hook
+        
+        net = net
+        
+        net.flatten.register_forward_hook(get_activation('flatten'))
+        
+        res =[]
         with torch.no_grad():
-            res = [net(d).data.cpu().numpy() for d in data]
+            for d in data:
+                output = net(d)
+                res.append(activation['flatten'].data.cpu().numpy())
+            #res = [net(d).data.cpu().numpy() for d in data]
         featureL = np.concatenate((res[0], res[1]), 1)
         featureR = np.concatenate((res[2], res[3]), 1)
         # print(featureL.shape, featureR.shape)
@@ -108,13 +123,13 @@ def getFeatureFromTorch(feature_save_dir, net, device, data_set, data_loader):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Testing')
-    parser.add_argument('--root', type=str, default='./data/lfw2', help='The path of lfw data')
-    parser.add_argument('--file_list', type=str, default='./data/lfw2/pairs.txt', help='The path of lfw pairs.txt')
-    parser.add_argument('--resume', type=str, default='./model/Iter_060000_net.ckpt',
+    parser.add_argument('--root', type=str, default='./data/lfw_funneled', help='The path of lfw data')
+    parser.add_argument('--file_list', type=str, default='./data/lfw_funneled/pairs.txt', help='The path of lfw pairs.txt')
+    parser.add_argument('--resume', type=str, default='./model/Iter_035700_net.ckpt',
                         help='The path pf save model')
     parser.add_argument('--feature_save_path', type=str, default='./result/cur_epoch_lfw_result.mat',
                         help='The path of the extract features save, must be .mat file')
-    parser.add_argument('--gpus', type=str, default='1,3', help='gpu list')
+    parser.add_argument('--gpus', type=str, default='0', help='gpu list')
     args = parser.parse_args()
 
     net, device, lfw_dataset, lfw_loader = loadModel(args.root, args.file_list, args.gpus, args.resume)

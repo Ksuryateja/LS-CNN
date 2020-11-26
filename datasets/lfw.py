@@ -69,8 +69,7 @@ class LFW(data.Dataset):
 
 
 if __name__ == '__main__':
-    pass
-    '''root = './data/lfw_funneled'
+    root = './data/lfw_funneled'
     file_list = './data/lfw_funneled/pairs.txt'
 
     transform = transforms.Compose([
@@ -83,4 +82,4 @@ if __name__ == '__main__':
     dataset = LFW(root, file_list, transform=transform)
     #dataset = LFW(root, file_list)
     trainloader = data.DataLoader(dataset, batch_size=64, shuffle=False, num_workers=2, drop_last=False)
-    print(len(dataset))'''
+    print(len(dataset))

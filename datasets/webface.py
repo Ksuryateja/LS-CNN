@@ -47,7 +47,7 @@ class  CASIAWebFace(data.Dataset):
 
 if __name__ == '__main__':
     pass
-    '''transform = transforms.Compose([
+    transform = transforms.Compose([
                 
                 transforms.RandomCrop(128),
                 transforms.RandomHorizontalFlip(),
@@ -57,6 +57,6 @@ if __name__ == '__main__':
     dataset = CASIAWebFace(imgInfo_csv = './data/img_info.csv', transform = transform)
     trainloader = data.DataLoader(dataset, batch_size = 64, shuffle = True, num_workers= 2, drop_last=False)
     print(len(dataset))
-'''
+
 
 
