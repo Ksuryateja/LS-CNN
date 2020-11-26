@@ -3,8 +3,8 @@ import scipy.io
 import os
 import json
 import torch.utils.data
-from backbone import mobilefacenet, resnet, arcfacenet, cbam
-from dataset.lfw import LFW
+from model import  LSCNN
+from datasets.lfw import LFW
 import torchvision.transforms as transforms
 from torch.nn import DataParallel
 import argparse
@@ -58,8 +58,10 @@ def loadModel(data_root, file_list, gpus='0', resume=None):
         multi_gpus = True
     os.environ['CUDA_VISIBLE_DEVICES'] = gpus
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-    net.load_state_dict(torch.load(resume)['net_state_dict'])
+    
+    net = LSCNN(10559, growth_rate = 48)
+    checkpoint = torch.load(resume, map_location='cpu')
+    net.load_state_dict(checkpoint['net_state_dict'])
 
     if multi_gpus:
         net = DataParallel(net).to(device)
@@ -67,6 +69,8 @@ def loadModel(data_root, file_list, gpus='0', resume=None):
         net = net.to(device)
 
     transform = transforms.Compose([
+        transforms.ToPILImage(),
+        transforms.Resize(128),
         transforms.ToTensor(),  # range [0, 255] -> [0.0,1.0]
         transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))  # range [0.0, 1.0] -> [-1.0,1.0]
     ])
@@ -104,9 +108,9 @@ def getFeatureFromTorch(feature_save_dir, net, device, data_set, data_loader):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Testing')
-    parser.add_argument('--root', type=str, default='./data/lfw_funneled', help='The path of lfw data')
-    parser.add_argument('--file_list', type=str, default='./data/lfw_funneled/pairs.txt', help='The path of lfw pairs.txt')
-    parser.add_argument('--resume', type=str, default='./model/SERES100_SERES100_IR_20190528_132635/Iter_342000_net.ckpt',
+    parser.add_argument('--root', type=str, default='./data/lfw2', help='The path of lfw data')
+    parser.add_argument('--file_list', type=str, default='./data/lfw2/pairs.txt', help='The path of lfw pairs.txt')
+    parser.add_argument('--resume', type=str, default='./model/Iter_060000_net.ckpt',
                         help='The path pf save model')
     parser.add_argument('--feature_save_path', type=str, default='./result/cur_epoch_lfw_result.mat',
                         help='The path of the extract features save, must be .mat file')

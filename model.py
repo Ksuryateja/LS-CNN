@@ -16,8 +16,8 @@ from datasets import webface
 class LSCNN(nn.Sequential):
     def __init__(
         self,
-        num_classes: int,
-        growth_rate: int,
+        num_classes: int = 10559,
+        growth_rate: int = 48,
         num_layers: Sequence[int] = (3, 3, 5)
         ):
         super().__init__()
@@ -47,4 +47,14 @@ class LSCNN(nn.Sequential):
         def forward(self, x: Tensor) -> Tensor:
             return super().forward(x)
 
+activation = {}
+def get_activation(name: str):
+    def hook(model, input, output):
+        activation[name] = output.detach()
+    return hook
 
+model = LSCNN()
+model.flatten.register_forward_hook(get_activation('flatten'))
+x = torch.randn(1, 3, 128, 128)
+output = model(x)
+print(activation['flatten'].size())

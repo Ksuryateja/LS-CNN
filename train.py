@@ -14,7 +14,6 @@ import torchvision.transforms as transforms
 import argparse
 from torch.utils.tensorboard import SummaryWriter
 
-
 def train(args):
     writer = SummaryWriter()
 
@@ -28,8 +27,10 @@ def train(args):
     # log init
     save_dir = args.save_dir
     if os.path.exists(save_dir):
-        raise NameError('model dir exists!')
-    os.makedirs(save_dir)
+        if not args.resume:
+            raise NameError('model dir exists!')
+    else:
+        os.makedirs(save_dir)
     logging = init_log(save_dir)
     _print = logging.info
 
@@ -49,24 +50,23 @@ def train(args):
     net = LSCNN(num_classes= 10559, growth_rate = 48)
     
     if args.resume:
-        print('resume the model parameters from: ', args.net_path, args.margin_path)
+        print('resume the model parameters from: ', args.net_path)
         net.load_state_dict(torch.load(args.net_path)['net_state_dict'])
 
     # define optimizers for different layer
     criterion = torch.nn.CrossEntropyLoss().to(device)
-    optimizer_ft = optim.Adam(net.parameters(), lr = 0.001, weight_decay=5e-4)
-    exp_lr_scheduler = lr_scheduler.MultiStepLR(optimizer_ft, milestones=[12, 16], gamma=0.1)
-
+    optimizer_ft = optim.SGD(net.parameters(), lr = 0.1, weight_decay = 1e-4, momentum = 0.9)
+    exp_lr_scheduler = lr_scheduler.MultiStepLR(optimizer_ft, milestones=[10, 20, 30], gamma=0.1)
+    
     if multi_gpus:
         net = DataParallel(net).to(device)
     else:
         net = net.to(device)
 
-
     best_val_acc = 0.0
     best_val_iters = 0
     total_iters = 0
-    #vis = Visualizer()
+
     for epoch in range(1, args.total_epoch + 1):
         exp_lr_scheduler.step()
         # train model
@@ -93,11 +93,11 @@ def train(args):
                 correct = (np.array(predict.cpu()) == np.array(label.data.cpu())).sum()
                 time_cur = (time.time() - since) / 100
                 since = time.time()
+                
                 writer.add_scalar("Accuracy/train", correct / total , total_iters)
                 writer.add_scalar("Loss/train", total_loss, total_iters)
-                
 
-                _print("Iters: {:0>6d}/[{:0>2d}], loss: {:.4f}, train_accuracy: {:.4f}, time: {:.2f} s/iter, learning rate: {}".format(total_iters, epoch, total_loss.item(), correct/total, time_cur, exp_lr_scheduler.get_lr()[0]))
+                _print("Iters: {:0>6d}/[{:0>2d}], loss: {:.4f}, train_accuracy: {:.4f}, time: {:.2f} s/iter, learning rate: {}".format(total_iters, epoch, total_loss.item(), correct/total, time_cur, exp_lr_scheduler.get_last_lr()))
 
             # save model
             if total_iters % args.save_freq == 0:
@@ -134,17 +134,18 @@ def train(args):
                 
                 val_acc = torch.cat(val_acc, dim=0)
                 val_loss = torch.cat(val_loss, dim = 0)
-                val_acc = torch.mean(val_acc)
+                val_acc = torch.mean(val_acc) * 100
                 val_loss = torch.mean(val_loss)
-                writer.add_scalar("Accuracy/val", val_acc, epoch)
-                writer.add_scalar("Loss/val", val_loss, epoch)
-                _print(f'val Ave Accuracy: {val_acc.item() * 100:.4f}, val Ave Loss: {val_loss.item():.4f}')
-                if best_val_acc <= val_acc * 100:
-                    best_val_acc = val_acc * 100
+                
+                writer.add_scalar("Accuracy/val", val_acc, total_iters)
+                writer.add_scalar("Loss/val", val_loss, total_iters)
+                
+                _print(f'val Ave Accuracy: {val_acc.item():.4f}, val Ave Loss: {val_loss.item():.4f}')
+                if best_val_acc <= val_acc.item() :
+                    best_val_acc = val_acc.item() 
                     best_val_iters = total_iters
 
                 _print(f'Current Best Accuracy: val: {best_val_acc:.4f} in iters: {best_val_iters}')
-
                 net.train()
 
     _print('Finally Best Accuracy: val: {:.4f} in iters: {}'.format(best_val_acc, best_val_iters))
@@ -155,12 +156,12 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch for deep face recognition')
     parser.add_argument('--train_data_info', type=str, default='./data/img_info.csv', help='train image info csv')
 
-    parser.add_argument('--batch_size', type=int, default=128, help='batch size')
-    parser.add_argument('--total_epoch', type=int, default=18, help='total epochs')
+    parser.add_argument('--batch_size', type=int, default=256, help='batch size')
+    parser.add_argument('--total_epoch', type=int, default=25, help='total epochs')
 
-    parser.add_argument('--save_freq', type=int, default=3000, help='save frequency')
-    parser.add_argument('--test_freq', type=int, default=3000, help='test frequency')
-    parser.add_argument('--resume', type=int, default=False, help='resume model')
+    parser.add_argument('--save_freq', type=int, default=1700, help='save frequency')
+    parser.add_argument('--test_freq', type=int, default=1700, help='test frequency')
+    parser.add_argument('--resume', type=bool, default=False, help='resume model')
     parser.add_argument('--net_path', type=str, default='', help='resume model')
     parser.add_argument('--save_dir', type=str, default='./model', help='model save dir')
     parser.add_argument('--gpus', type=str, default='0,1,2,3', help='model prefix')
@@ -168,4 +169,3 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     train(args)
- 
