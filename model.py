@@ -59,7 +59,9 @@ class LSCNN(nn.Sequential):
         self.add_module('relu', nn.ReLU(inplace=True))
         self.add_module('avgPool', nn.AvgPool2d(kernel_size = 7, stride = 1))
         self.add_module('flatten', nn.Flatten())
-        self.add_module('linear', nn.Linear(D3_in + num_layers[2] * growth_rate, num_classes))
+        self.add_module('fc', nn.Linear(D3_in + num_layers[2] * growth_rate, 512))
+        self.add_module('classification', nn.Linear(512, num_classes))
+
         #self.add_module('softmax', nn.Softmax(dim = 1))
 
         def forward(self, x: Tensor) -> Tensor:

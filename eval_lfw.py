@@ -97,13 +97,13 @@ def getFeatureFromTorch(feature_save_dir, net, device, data_set, data_loader):
         
         net = net
         
-        net.flatten.register_forward_hook(get_activation('flatten'))
+        net.fc.register_forward_hook(get_activation('fc'))
         
         res =[]
         with torch.no_grad():
             for d in data:
                 output = net(d)
-                res.append(activation['flatten'].data.cpu().numpy())
+                res.append(activation['fc'].data.cpu().numpy())
             #res = [net(d).data.cpu().numpy() for d in data]
         featureL = np.concatenate((res[0], res[1]), 1)
         featureR = np.concatenate((res[2], res[3]), 1)
