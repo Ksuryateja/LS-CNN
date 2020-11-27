@@ -37,18 +37,24 @@ def train(args):
     _print = logging.info
 
     # dataset loader
-    transform = transforms.Compose([
+    train_transform = transforms.Compose([
                 transforms.RandomCrop(128),
                 transforms.RandomHorizontalFlip(),
                 transforms.ToTensor(),  # range [0, 255] -> [0.0,1.0]
                 transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))  # range [0.0, 1.0] -> [-1.0,1.0]
                 ])
     # validation dataset
-    train_set = CASIAWebFace(args.train_data_info, transform = transform)
+    train_set = CASIAWebFace(args.train_data_info, transform = train_transform)
+    train_loader = torch.utils.data.DataLoader(train_set, batch_size=args.batch_size, shuffle=True, num_workers=2, drop_last=False)
     
-    train_loader = torch.utils.data.DataLoader(train_set, batch_size=args.batch_size, shuffle=True, num_workers=32, drop_last=False)
-    lfw_dataset = LFW('./data/lfw_funneled', './data/lfw_funneled/pairs.txt')
-    lfw_dataloader = torch.utils.data.DataLoader(lfw_dataset, batch_size= 128, shuffle=False, num_workers=32, drop_last=False)
+    test_transform = transforms.Compose([
+        transforms.ToPILImage(),
+        transforms.Resize(128),
+        transforms.ToTensor(),  # range [0, 255] -> [0.0,1.0]
+        transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))  # range [0.0, 1.0] -> [-1.0,1.0]
+    ])
+    lfw_dataset = LFW('./data/lfw_funneled', './data/lfw_funneled/pairs.txt', transform = test_transform)
+    lfw_dataloader = torch.utils.data.DataLoader(lfw_dataset, batch_size= 128, shuffle=False, num_workers=2, drop_last=False)
     
     net = LSCNN(num_classes= 10559, growth_rate = 48)
     
@@ -142,15 +148,15 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch for deep face recognition')
     parser.add_argument('--train_data_info', type=str, default='./data/img_info.csv', help='train image info csv')
 
-    parser.add_argument('--batch_size', type=int, default=256, help='batch size')
+    parser.add_argument('--batch_size', type=int, default=64, help='batch size')
     parser.add_argument('--total_epoch', type=int, default=25, help='total epochs')
 
-    parser.add_argument('--save_freq', type=int, default=1700, help='save frequency')
-    parser.add_argument('--test_freq', type=int, default=1700, help='test frequency')
+    parser.add_argument('--save_freq', type=int, default=3500, help='save frequency')
+    parser.add_argument('--test_freq', type=int, default=3500, help='test frequency')
     parser.add_argument('--resume', type=bool, default=False, help='resume model')
     parser.add_argument('--net_path', type=str, default='', help='resume model')
     parser.add_argument('--save_dir', type=str, default='./model', help='model save dir')
-    parser.add_argument('--gpus', type=str, default='0,1,2,3', help='model prefix')
+    parser.add_argument('--gpus', type=str, default='0', help='model prefix')
 
     args = parser.parse_args()
 
